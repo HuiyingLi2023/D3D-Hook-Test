@@ -229,21 +229,24 @@ HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 
 	// Store the output in an IDirect3DSurface9
 	HRESULT tmpResult = S_OK;
-	IDirect3DSurface9* capture;
-	IDirect3DSurface9* rendertarget;
-	D3DSURFACE_DESC surfaceDesc;
-	
-	tmpResult = device->GetRenderTarget(0, &rendertarget);
-	tmpResult = rendertarget->GetDesc(&surfaceDesc);
-	if (tmpResult != S_OK)
+	static IDirect3DSurface9* capture = NULL;
+	static IDirect3DSurface9* rendertarget = NULL;
+	static D3DSURFACE_DESC surfaceDesc;
+	if (!capture)
 	{
-		// We couldn't capture the screen, give up this frame..
+		tmpResult = device->GetRenderTarget(0, &rendertarget);
+		tmpResult = rendertarget->GetDesc(&surfaceDesc);
+		tmpResult = device->CreateOffscreenPlainSurface(surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format, D3DPOOL_SYSTEMMEM, &capture, NULL);
+		if (tmpResult != S_OK)
+		{
+			// We couldn't capture the screen, give up this frame..
 #ifdef _HKDEBUG_
-		MessageBoxA(NULL, "Couldn't get front buffer data", "EndScene", MB_ICONEXCLAMATION);
+			MessageBoxA(NULL, "Couldn't get front buffer data", "EndScene", MB_ICONEXCLAMATION);
 #endif
-		return result;
+			return result;
+		}
 	}
-	tmpResult = device->CreateOffscreenPlainSurface(surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format, D3DPOOL_SYSTEMMEM, &capture, NULL);
+	
 	tmpResult = device->GetRenderTargetData(rendertarget, capture);
 
 	if (tmpResult != S_OK)
@@ -256,7 +259,7 @@ HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 		return result;
 	}
 	// capture now contains the screen buffer
-	capture->Release();
+	D3DXSaveSurfaceToFile("Capture.bmp", D3DXIFF_BMP, capture, NULL, NULL);
 
 	return result;
 }
