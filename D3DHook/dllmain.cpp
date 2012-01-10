@@ -22,7 +22,7 @@ EndScene_t D3DEndScene_orig;
 HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, 
                     DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, 
                     IDirect3DDevice9** ppReturnedDeviceInterface);
-HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* surface);
+HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device);
 
 // vtable stuff
 PDWORD IDirect3D9_vtable = NULL;
@@ -161,10 +161,10 @@ HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D
 	return result;
 }
 
-HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* surface)
+HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 {
-	HRESULT result = D3DEndScene_orig(surface);
+	HRESULT result = D3DEndScene_orig(device);
 	MessageBoxA(NULL, "EndScene hook called", "EndScene hook called", MB_ICONEXCLAMATION);
-
+	device->GetBackBuffer(
 	return result;
 }
