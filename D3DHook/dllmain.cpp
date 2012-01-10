@@ -1,4 +1,20 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
+/**
+ * DirectX 9 Output interceptor
+ * Tom Gascoigne <tom@gascoigne.me>
+ *
+ * Basically, this dll works by loading itsself into
+ * a directx program's address space, then obtaining 
+ * pointers to the vtable for objects that it's interested
+ * in. From here, the dll can locate the pointer to the
+ * function it wants to hook, and replace it with
+ * a pointer to its own function. This allows the
+ * program to intercept any parameters and objects
+ * in use by the function, where it can obtain video
+ * output.
+ * It then executes the original function and returns the
+ * output, making the program unaware that anything happened.
+ *
+ */
 #include "stdafx.h"
 
 #include <d3d9.h>
@@ -68,6 +84,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	return TRUE;
 }
 
+/**
+ * This function sets up the hook for CreateDevice by replacing the pointer
+ * to CreateDevice within IDirect3D9's vtable.
+ */
 HRESULT WINAPI HookCreateDevice()
 {
 	// Obtain a D3D object
@@ -103,6 +123,11 @@ HRESULT WINAPI HookCreateDevice()
 	return D3D_OK;
 }
 
+/**
+ * Thanks to HookCreateDevice(), The program should now call this method instead of
+ * Direct3D's CreateDevice method. This allows us to then hook the IDirect3DDevice9 
+ * methods we need
+ */
 HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, 
                     DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, 
                     IDirect3DDevice9** ppReturnedDeviceInterface)
@@ -162,6 +187,10 @@ DWORD WINAPI VTablePatchThread(LPVOID threadParam)
 	}
 }
 
+/**
+ * This is called when each frame has finished
+ * from here we can intercept the video output
+ */
 HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 {
 	HRESULT result = D3DEndScene_orig(device);
