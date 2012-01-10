@@ -23,6 +23,9 @@
 #pragma comment (lib, "d3d9.lib")
 #pragma comment (lib, "d3dx9.lib")
 
+#include "MPEGEncoder.h"
+
+
 #undef _HKDEBUG_
 
 // Prototypes for d3d functions we want to hook
@@ -44,14 +47,16 @@ HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device);
 
 // vtable stuff
 PDWORD IDirect3D9_vtable = NULL;
+
 // Function indices: These are liable to change
 // This is the functions index into the vtable
 // Find these by reading through d3d9.h and counting in order
-
 // IDirect3D9
 #define CREATEDEVICE_VTI 16
 // IDirect3DDevice9
 #define ENDSCENE_VTI 42
+
+MPEGEncoder* g_mpegEncoder = NULL;
 
 HRESULT WINAPI HookCreateDevice();
 DWORD WINAPI VTablePatchThread(LPVOID threadParam);
@@ -67,9 +72,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-#ifdef _HKDEBUG_
+//#ifdef _HKDEBUG_
 		MessageBoxA(NULL, "DLL Injected", "DLL Injected", MB_ICONEXCLAMATION);
-#endif
+//#endif
 		// First, We want to create our own D3D object so that we can hook CreateDevice
 		if (HookCreateDevice() == D3D_OK)
 		{
@@ -85,6 +90,14 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
+		/*
+		// TODO: Hook directx shutdown for this
+		if (g_mpegEncoder)
+		{
+			MessageBoxA(NULL, "Detached from process", "DLL", MB_ICONEXCLAMATION);
+			delete g_mpegEncoder;
+		}
+		*/
 		break;
 	}
 	return TRUE;
@@ -149,7 +162,9 @@ HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D
 #ifdef _HKDEBUG_
 	MessageBoxA(NULL, "CreateDevice called", "CreateDevice", MB_ICONEXCLAMATION);
 #endif
-	HRESULT result = D3DCreateDevice_orig(Direct3D_Object, Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
+	// Append the almighty D3DCREATE_MULTITHREADED flag...
+	HRESULT result = D3DCreateDevice_orig(Direct3D_Object, Adapter, DeviceType, hFocusWindow, BehaviorFlags | D3DCREATE_MULTITHREADED, pPresentationParameters, ppReturnedDeviceInterface);
+
 	// Now we've intercepted the program's call to CreateDevice and we have the IDirect3DDevice9 that it uses
 	// We can get it's vtable and patch in our own detours
 	// Reset the CreateDevice hook since it's no longer needed
@@ -213,53 +228,23 @@ DWORD WINAPI VTablePatchThread(LPVOID threadParam)
  */
 HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 {
-	// Place a red 20x20 rectangle on the screen so we know it worked
-	HRESULT result = D3DEndScene_orig(device);
+	HRESULT result;
+	if (!g_mpegEncoder)
+	{
+		g_mpegEncoder = new MPEGEncoder(device);
+		result = D3DEndScene_orig(device);
+		g_mpegEncoder->Start();
+		return result;
+	}
+	result = D3DEndScene_orig(device);
 #ifdef _HKDEBUG_
 	MessageBoxA(NULL, "EndScene hook called", "EndScene", MB_ICONEXCLAMATION);
 #endif
 	// Here, we can get the output of the d3d device using GetBackBuffer, and send it off to
 	// a file, or to be encoded, or whatever. *borat* Great success!!
 
-	// First, find the screen resolution
-	D3DDEVICE_CREATION_PARAMETERS cparams;
-	RECT screenDims;
-	device->GetCreationParameters(&cparams);
-	GetWindowRect(cparams.hFocusWindow, &screenDims);
-
-	// Store the output in an IDirect3DSurface9
-	HRESULT tmpResult = S_OK;
-	static IDirect3DSurface9* capture = NULL;
-	static IDirect3DSurface9* rendertarget = NULL;
-	static D3DSURFACE_DESC surfaceDesc;
-	if (!capture)
-	{
-		tmpResult = device->GetRenderTarget(0, &rendertarget);
-		tmpResult = rendertarget->GetDesc(&surfaceDesc);
-		tmpResult = device->CreateOffscreenPlainSurface(surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format, D3DPOOL_SYSTEMMEM, &capture, NULL);
-		if (tmpResult != S_OK)
-		{
-			// We couldn't capture the screen, give up this frame..
-#ifdef _HKDEBUG_
-			MessageBoxA(NULL, "Couldn't get front buffer data", "EndScene", MB_ICONEXCLAMATION);
-#endif
-			return result;
-		}
-	}
-	
-	tmpResult = device->GetRenderTargetData(rendertarget, capture);
-
-	if (tmpResult != S_OK)
-	{
-		// We couldn't capture the screen, give up this frame..
-		capture->Release();
-#ifdef _HKDEBUG_
-		MessageBoxA(NULL, "Couldn't get front buffer data", "EndScene", MB_ICONEXCLAMATION);
-#endif
-		return result;
-	}
 	// capture now contains the screen buffer
-	D3DXSaveSurfaceToFile("Capture.bmp", D3DXIFF_BMP, capture, NULL, NULL);
+	//D3DXSaveSurfaceToFile("Capture.bmp", D3DXIFF_BMP, capture, NULL, NULL);
 
 	return result;
 }
