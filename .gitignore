@@ -1,0 +1,11 @@
+*.sdf
+*.opensdf
+*.sln
+*.suo
+*.bat
+*.vcxproj
+*.filters
+*.user
+Debug/
+Release/
+
