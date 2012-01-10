@@ -237,13 +237,10 @@ HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 		return result;
 	}
 	result = D3DEndScene_orig(device);
-#ifdef _HKDEBUG_
-	MessageBoxA(NULL, "EndScene hook called", "EndScene", MB_ICONEXCLAMATION);
-#endif
+
 	// Here, we can get the output of the d3d device using GetBackBuffer, and send it off to
 	// a file, or to be encoded, or whatever. *borat* Great success!!
 
-	// capture now contains the screen buffer
 	//D3DXSaveSurfaceToFile("Capture.bmp", D3DXIFF_BMP, capture, NULL, NULL);
 
 	return result;
