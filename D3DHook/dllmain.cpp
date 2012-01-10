@@ -36,6 +36,7 @@ PDWORD IDirect3D9_vtable = NULL;
 #define ENDSCENE_VTI 42
 
 HRESULT WINAPI HookCreateDevice();
+DWORD WINAPI VTablePatchThread(LPVOID threadParam);
 
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -102,22 +103,6 @@ HRESULT WINAPI HookCreateDevice()
 	return D3D_OK;
 }
 
-/**
- * This is a thread which indefinately resets the vtable pointers to our own functions
- * This is needed because the program might set these pointers back to
- * their original values at any point
- */
-DWORD WINAPI VTablePatchThread(LPVOID threadParam)
-{
-	MessageBoxA(NULL, "VTable patch thread started", "Patch Thread", MB_ICONEXCLAMATION);
-	while (true)
-	{
-		Sleep(100);
-
-		*(DWORD*)&IDirect3D9_vtable[ENDSCENE_VTI] = (DWORD)D3DEndScene_hook;
-	}
-}
-
 HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, 
                     DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, 
                     IDirect3DDevice9** ppReturnedDeviceInterface)
@@ -161,10 +146,27 @@ HRESULT WINAPI D3DCreateDevice_hook(IDirect3D9* Direct3D_Object, UINT Adapter, D
 	return result;
 }
 
+/**
+ * This is a thread which indefinately resets the vtable pointers to our own functions
+ * This is needed because the program might set these pointers back to
+ * their original values at any point
+ */
+DWORD WINAPI VTablePatchThread(LPVOID threadParam)
+{
+	MessageBoxA(NULL, "VTable patch thread started", "Patch Thread", MB_ICONEXCLAMATION);
+	while (true)
+	{
+		Sleep(100);
+
+		*(DWORD*)&IDirect3D9_vtable[ENDSCENE_VTI] = (DWORD)D3DEndScene_hook;
+	}
+}
+
 HRESULT WINAPI D3DEndScene_hook(IDirect3DDevice9* device)
 {
 	HRESULT result = D3DEndScene_orig(device);
 	MessageBoxA(NULL, "EndScene hook called", "EndScene hook called", MB_ICONEXCLAMATION);
-	device->GetBackBuffer(
+	// Here, we can get the output of the d3d device using GetBackBuffer, and send it off to
+	// a file, or to be encoded, or whatever. *borat* Great success!!
 	return result;
 }
